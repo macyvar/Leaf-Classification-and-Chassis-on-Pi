@@ -16,62 +16,63 @@ This README includes:
 - Autonomous navigation overview  
 
 ---
+# Universal Motor Driver System
+
+This project now supports **two motor driver types**:
+
+| Driver | File Used | Notes |
+|--------|-----------|-------|
+| **L298N** | `motor/l298n.py` | Works with older red dual-H-bridge modules |
+| **TB6612** | `motor/tb6612.py` | Newer Adafruit-style high-efficiency motor driver |
+
+You select the driver in:
+
+### `config.py`
+```python
+MOTOR_DRIVER = "TB6612"   # or change to "L298N"
+```
+
+Then everywhere in the code, motors are used like:
+
+```python
+from motor import forward, backward, turn_left, turn_right, stop
+```
+
+The rest is automatic — the correct driver is imported internally.
+
+---
 
 # Pinout & Wiring Guide
 
 This section describes how to wire the motors, TB6612 motor driver, battery pack, Raspberry Pi, and US-100 ultrasonic sensor.
 
 ## Motor Wiring
+Below are wiring tables for **both motor drivers** so teammates can use either one.
 
-### Left Side Motors (2 motors)
+### TB6612 Motor Driver Wiring
 
-**Motor A**
-- Red → TB6612 **A01**
-- Black → TB6612 **A02**
+| Motor | Red Wire | Black Wire |
+|--------|----------|-------------|
+| Motor A (Left) | A01 | A02 |
+| Motor B (Left) | A01 | A02 |
+| Motor C (Right) | B01 | B02 |
+| Motor D (Right) | B01 | B02 |
 
-**Motor B**
-- Red → TB6612 **A01** (same as Motor A red)
-- Black → TB6612 **A02** (same as Motor A black)
+### L298N Motor Driver Wiring 
 
-### Right Side Motors (2 motors)
+| Motor | Red Wire | Black Wire |
+|--------|----------|-------------|
+| Motor A/B (Left) | OUT1 | OUT2 |
+| Motor C/D (Right) | OUT3 | OUT4 |
 
-**Motor C**
-- Red → TB6612 **B01**
-- Black → TB6612 **B02**
-
-**Motor D**
-- Red → TB6612 **B01** (same as Motor C red)
-- Black → TB6612 **B02** (same as Motor C black)
-
-## TB6612 Motor Driver Pinout
-
-| TB6612 Pin | Connects To |
-|------------|-------------|
-| A01 | Motor A red, Motor B red |
-| A02 | Motor A black, Motor B black |
-| B01 | Motor C red, Motor D red |
-| B02 | Motor C black, Motor D black |
-| AIN1 | Raspberry Pi GPIO **17** |
-| AIN2 | Raspberry Pi GPIO **27** |
-| BIN1 | Raspberry Pi GPIO **22** |
-| BIN2 | Raspberry Pi GPIO **23** |
-| PWMA | Raspberry Pi GPIO **12** (Left PWM speed) |
-| PWMB | Raspberry Pi GPIO **13** (Right PWM speed) |
-| STBY | Raspberry Pi GPIO **24** |
-| VCC | Raspberry Pi **3.3V** |
-| VM | Battery **+** |
-| GND | Battery **–**, Raspberry Pi **GND** |
-
-
-## Power System
+# Power System
 
 ### Battery Pack (4×AA or 6V motor pack)
+- Battery **+** → motor driver **VM** (TB6612) or **12V IN** (L298N)  
+- Battery **–** → motor driver **GND**
 
-- **Battery + (red)** → TB6612 **VM**
-- **Battery – (black)** → TB6612 **GND**  
-
-The Raspberry Pi is powered separately via USB-C.  
-The battery ground **must be shared** with Raspberry Pi GND.
+**Pi and motor driver MUST share ground.**  
+**Do NOT power the Pi from the motor driver.**
 
 
 ## Raspberry Pi Power to Breadboard
@@ -94,17 +95,24 @@ The battery ground **must be shared** with Raspberry Pi GND.
 
 ## Raspberry Pi GPIO Summary
 
-| Function | GPIO Pin |
-|---------|----------|
-| Motor AIN1 | 17 |
-| Motor AIN2 | 27 |
-| Motor BIN1 | 22 |
-| Motor BIN2 | 23 |
-| Left Motor PWM | 12 |
-| Right Motor PWM | 13 |
-| Ultrasonic TRIG | 5 |
-| Ultrasonic ECHO | 6 |
-| TB6612 Standby (STBY) | 24 |
+Both drivers use the **same direction and PWM pins**, but TB6612 requires one additional pin (**STBY**).
+
+| Purpose | GPIO Pin | Used By |
+|---------|----------|---------|
+| Motor Left Direction 1 | **17** | L298N + TB6612 |
+| Motor Left Direction 2 | **27** | L298N + TB6612 |
+| Motor Right Direction 1 | **22** | L298N + TB6612 |
+| Motor Right Direction 2 | **23** | L298N + TB6612 |
+| Left Motor PWM | **12** | ENA (L298N) / PWMA (TB6612) |
+| Right Motor PWM | **13** | ENB (L298N) / PWMB (TB6612) |
+| **Motor Driver Standby (STBY)** | **24** | **TB6612 only** |
+| Ultrasonic TRIG | **5** | L298N + TB6612 |
+| Ultrasonic ECHO | **6** | L298N + TB6612 |
+
+Notes
+- **TB6612 requires STBY** (GPIO 24). This pin *must* be pulled HIGH for motors to operate.  
+- **L298N does NOT use STBY.** If you're using L298N, ignore GPIO 24 entirely.  
+- PWM pins (**12** and **13**) must support hardware PWM — these GPIOs do.
 
 ---
 
@@ -130,13 +138,15 @@ print("Camera OK. Frame shape:", frame.shape)
 EOF
 ```
 
-Expected:
+**Expected:**
 ```
 Camera OK. Frame shape: (480, 640, 3)
 ```
 
 
-## Motor Test
+
+## Motor Test (works for TB6612 or L298N)
+Because of the universal driver system, this test works for *everyone*:
 
 ```bash
 cd plant_robot
@@ -144,15 +154,21 @@ python3 - << 'EOF'
 from motor import forward, stop
 import time
 
-print("Motors test: forward 1 sec")
-forward(60)
+print("Motors test: forward for 1 sec")
+forward(60)   # speed 0–100
 time.sleep(1)
 stop()
 EOF
 ```
 
-Expected:
-- Robot wheels spin forward for 1 second.
+**Expected behavior:**
+- Left & right motors spin forward for ~1 second.
+
+If the motors do NOT move:
+- Check motor driver wiring  
+- Ensure battery pack is connected  
+- Ensure grounds are shared  
+- Ensure `config.py` has the correct driver selected  
 
 
 ## Ultrasonic Sensor Test
@@ -168,81 +184,65 @@ for i in range(5):
 EOF
 ```
 
-Expected output around:
+Expected output:
 ```
 Distance: 34.2 cm
 Distance: 36.1 cm
 Distance: 35.5 cm
 ```
-
 ---
 
 # Dashboard Web Interface
-
-The dashboard lets you:
-
-- Start/stop robot  
-- View live classification logs  
-- View saved leaf images  
-
-
-## Step 1 — Start Dashboard (On Raspberry Pi)
-
+### 1. Start the dashboard on the Pi
 ```bash
 cd plant_robot
 python3 dashboard.py
 ```
 
 You should see:
-
 ```
 Running on http://0.0.0.0:5000
 ```
 
----
-
-## Step 2 — Get Pi IP Address
-
+### 2. Find the Pi’s IP
 ```bash
 hostname -I
 ```
 
-
-## Step 3 — Open Dashboard (On Laptop/Phone)
-
-Visit:
-
+### 3. Open the dashboard on your computer
 ```
 http://<PI-IP>:5000
 ```
 
 You should see:
-
-- Robot status (RUNNING/STOPPED)  
+- RUNNING/STOPPED status  
 - Start / Stop buttons  
-- Classification table  
-- Images  
+- Classification logs  
+- Thumbnail images
 
 ---
 
 # Autonomous Robot Mode
 
-Run in a second SSH window:
+Start autonomous control:
 
 ```bash
 cd plant_robot
 python3 autonomous_robot.py
 ```
 
-Then click **Start Robot** on the dashboard.
+Then in the dashboard, click:
 
-Robot will:
+### **START ROBOT**
 
-- Drive forward  
-- Detect obstacles and turn  
-- Capture images  
-- Classify HEALTHY / DISEASED  
-- Save logs + snapshots  
+The robot will:
+
+1. Drive forward  
+2. Avoid obstacles  
+3. Capture leaf images  
+4. Run the ML classifier  
+5. Save snapshots & results  
+6. Update dashboard  
 
 ---
 
