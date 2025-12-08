@@ -5,7 +5,13 @@ import json, os
 
 app = Flask(__name__)
 
+os.makedirs("logs/images", exist_ok=True)
+results_path = "logs/results.json"
+if not os.path.exists(results_path):
+    json.dump([], open(results_path, "w"))
+
 robot_state = {"running": False}
+
 
 def set_state(v):
     robot_state["running"] = v
@@ -71,12 +77,18 @@ def index():
 @app.route("/img/<int:i>")
 def image(i):
     logs = json.load(open("logs/results.json"))
+    
+    if i >= len(logs):
+        from flask import Response
+        return Response(b"\x89PNG\r\n\x1a\n", mimetype="image/png")
+
     return send_file(logs[i]["image"])
 
 @app.route("/start", methods=["POST"])
 def start():
     set_state(True)
     return jsonify({"status":"running"})
+
 
 @app.route("/stop", methods=["POST"])
 def stop():
