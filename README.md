@@ -309,7 +309,6 @@ A small custom head is added:
 - Dropout(0.3)  
 - Dense(2, softmax)  
 
----
 
 # Training Objective
 
@@ -369,7 +368,6 @@ else:
 
 This reduces false positives.
 
----
 
 # TFLite Inference
 
