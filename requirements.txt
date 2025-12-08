@@ -1,0 +1,9 @@
+# REQUIREMENTS.TXT
+
+tensorflow
+tflite-runtime
+opencv-python
+flask
+numpy
+picamera2
+RPi.GPIO
