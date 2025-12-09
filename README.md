@@ -1,11 +1,15 @@
 # Plant Health Monitoring Robot
-### Autonomous Leaf Detection • Disease Classification • Obstacle Avoidance • Web Dashboard Control
+## Autonomous Leaf Detection • Disease Classification • Obstacle Avoidance • Web Dashboard Control
+## Introduction
 
 This robot uses a Raspberry Pi, camera, TB6612 motor driver, ultrasonic sensor, and a machine-learning leaf classifier to autonomously navigate, detect plants, capture images, and classify plant health.
 
 This README includes:
 
-- Full wiring guide  
+- Results
+- Background and Methodology
+- Full wiring guide
+- Block Diagram
 - Hardware pinout tables  
 - System testing guide  
 - Dashboard and autonomous mode instructions  
@@ -13,7 +17,12 @@ This README includes:
 - Data preprocessing steps  
 - Gate-based classification logic  
 - TensorFlow Lite inference pipeline  
-- Autonomous navigation overview  
+- Autonomous navigation overview
+---
+# Results
+
+---
+# Background and Methodology
 
 ---
 # Universal Motor Driver System
