@@ -63,7 +63,7 @@ These results validate the ML pipeline and justify deploying the classifier on t
 
 ---
 # Background and Methodology
-> Further explination and testing instructions are in sections *Dashboard and autonomous mode instructions, Model training pipeline>, Data preprocessing steps, Gate-based classification logic, TensorFlow Lite inference pipeline*
+> Further explination and testing instructions are in sections *Dashboard and autonomous mode instructions, Model training pipeline, Data preprocessing steps, Gate-based classification logic, TensorFlow Lite inference pipeline*
 
 
 Plant disease detection is critical for agriculture because early identification prevents crop loss and reduces pesticide usage. Traditional inspection is manual, slow, and inconsistent. This project explores an embedded AI approach where autonomous robots can monitor plant health continuously and cheaply.
