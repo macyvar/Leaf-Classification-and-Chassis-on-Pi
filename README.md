@@ -47,7 +47,7 @@ The rest is automatic — the correct driver is imported internally.
 This section describes how to wire the motors, TB6612 motor driver, battery pack, Raspberry Pi, and US-100 ultrasonic sensor.
 
 ## Motor Wiring
-Below are wiring tables for **both motor drivers** so teammates can use either one.
+Below are wiring tables for **both motor drivers** so either one can be used.
 
 ### TB6612 Motor Driver Wiring
 
@@ -265,7 +265,7 @@ healthy
 diseased
 ```
 
-Non-leaf detection is handled via confidence thresholds (see Gate System).
+Nonleaf detection is handled via confidence thresholds (see Gate System).
 
 
 # Data Processing & Augmentation
