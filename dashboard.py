@@ -1,21 +1,88 @@
-## DASHBOARD.PY
+###############################################
+#  LEAF ROBOT DASHBOARD + AUTONOMOUS CONTROL  #
+###############################################
 
 from flask import Flask, render_template_string, send_file, jsonify
-import json, os
+from threading import Thread
+import time, json, os
+
+# ---- Motor Driver ----
+from motor import forward, stop as motor_stop
+
+# ---- OPTIONAL FUTURE SENSORS ----
+# from ultrasonic import get_distance
+# from leaf_pipeline import classify_frame
 
 app = Flask(__name__)
 
+# Storage for images + results
 os.makedirs("logs/images", exist_ok=True)
 results_path = "logs/results.json"
 if not os.path.exists(results_path):
     json.dump([], open(results_path, "w"))
 
+# Shared state
 robot_state = {"running": False}
 
 
 def set_state(v):
     robot_state["running"] = v
     print("Robot state ->", v)
+
+
+###############################################
+# AUTONOMOUS CONTROL LOOP (runs in background)
+###############################################
+
+def autonomous_loop():
+    print("Autonomous loop running...")
+    while True:
+        if robot_state["running"]:
+            # -------------------------------
+            #  BASIC DRIVING BEHAVIOR
+            # -------------------------------
+            forward()
+            time.sleep(0.1)
+
+            # -------------------------------
+            #  PLACEHOLDER FOR SENSORS
+            # -------------------------------
+            # dist = get_distance()
+            # if dist < 20:
+            #     motor_stop()
+            #     time.sleep(1)
+            #     continue
+
+            # -------------------------------
+            #  PLACEHOLDER FOR LEAF DETECTOR
+            # -------------------------------
+            # result, img_path = classify_frame()
+            # log_result(result, img_path)
+            # time.sleep(1)
+
+        else:
+            motor_stop()
+            time.sleep(0.1)
+
+
+###############################################
+# LOGGING
+###############################################
+
+def log_result(result, img_path):
+    logs = json.load(open(results_path))
+    entry = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "result": result,
+        "image": img_path
+    }
+    logs.append(entry)
+    json.dump(logs, open(results_path, "w"), indent=2)
+
+
+###############################################
+# HTML DASHBOARD TEMPLATE
+###############################################
 
 TEMPLATE = """
 <!DOCTYPE html>
@@ -49,7 +116,7 @@ function send(cmd) {
     fetch('/' + cmd, {method:'POST'})
     .then(r => r.json()).then(_ => location.reload());
 }
-setTimeout(()=>location.reload(), 5000);
+setTimeout(()=>location.reload(), 3000);
 </script>
 
 <table>
@@ -66,34 +133,54 @@ setTimeout(()=>location.reload(), 5000);
 </body></html>
 """
 
+
+###############################################
+# ROUTES
+###############################################
+
 @app.route("/")
 def index():
     try:
-        logs = json.load(open("logs/results.json"))
+        logs = json.load(open(results_path))
     except:
         logs = []
     return render_template_string(TEMPLATE, logs=logs, running=robot_state["running"])
 
+
 @app.route("/img/<int:i>")
 def image(i):
-    logs = json.load(open("logs/results.json"))
-    
+    logs = json.load(open(results_path))
+
+    # If missing image return blank 1-pixel PNG
     if i >= len(logs):
         from flask import Response
         return Response(b"\x89PNG\r\n\x1a\n", mimetype="image/png")
 
     return send_file(logs[i]["image"])
 
+
 @app.route("/start", methods=["POST"])
 def start():
+    print("Start button pressed.")
     set_state(True)
-    return jsonify({"status":"running"})
+    return jsonify({"status": "running"})
 
 
 @app.route("/stop", methods=["POST"])
 def stop():
+    print("Stop button pressed.")
     set_state(False)
-    return jsonify({"status":"stopped"})
+    motor_stop()
+    return jsonify({"status": "stopped"})
+
+
+###############################################
+# START BACKGROUND THREAD + RUN SERVER
+###############################################
 
 if __name__ == "__main__":
+    t = Thread(target=autonomous_loop, daemon=True)
+    t.start()
+
+    print("Starting dashboard on http://0.0.0.0:5000 ...")
     app.run(host="0.0.0.0", port=5000)
