@@ -9,10 +9,6 @@ import time, json, os
 # ---- Motor Driver ----
 from motor import forward, stop as motor_stop
 
-# ---- OPTIONAL FUTURE SENSORS ----
-# from ultrasonic import get_distance
-# from leaf_pipeline import classify_frame
-
 app = Flask(__name__)
 
 # Storage for images + results
@@ -38,50 +34,15 @@ def autonomous_loop():
     print("Autonomous loop running...")
     while True:
         if robot_state["running"]:
-            # -------------------------------
-            #  BASIC DRIVING BEHAVIOR
-            # -------------------------------
-            forward()
+            forward()       # <---- THIS MAKES MOTOR MOVE
             time.sleep(0.1)
-
-            # -------------------------------
-            #  PLACEHOLDER FOR SENSORS
-            # -------------------------------
-            # dist = get_distance()
-            # if dist < 20:
-            #     motor_stop()
-            #     time.sleep(1)
-            #     continue
-
-            # -------------------------------
-            #  PLACEHOLDER FOR LEAF DETECTOR
-            # -------------------------------
-            # result, img_path = classify_frame()
-            # log_result(result, img_path)
-            # time.sleep(1)
-
         else:
-            motor_stop()
+            motor_stop()    # <---- STOPS MOTOR
             time.sleep(0.1)
 
 
 ###############################################
-# LOGGING
-###############################################
-
-def log_result(result, img_path):
-    logs = json.load(open(results_path))
-    entry = {
-        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "result": result,
-        "image": img_path
-    }
-    logs.append(entry)
-    json.dump(logs, open(results_path, "w"), indent=2)
-
-
-###############################################
-# HTML DASHBOARD TEMPLATE
+# HTML TEMPLATE
 ###############################################
 
 TEMPLATE = """
@@ -150,35 +111,33 @@ def index():
 @app.route("/img/<int:i>")
 def image(i):
     logs = json.load(open(results_path))
-
-    # If missing image return blank 1-pixel PNG
     if i >= len(logs):
         from flask import Response
         return Response(b"\x89PNG\r\n\x1a\n", mimetype="image/png")
-
     return send_file(logs[i]["image"])
 
 
 @app.route("/start", methods=["POST"])
 def start():
-    print("Start button pressed.")
+    print("Start pressed!")
     set_state(True)
     return jsonify({"status": "running"})
 
 
 @app.route("/stop", methods=["POST"])
 def stop():
-    print("Stop button pressed.")
+    print("Stop pressed!")
     set_state(False)
     motor_stop()
     return jsonify({"status": "stopped"})
 
 
 ###############################################
-# START BACKGROUND THREAD + RUN SERVER
+# START THREAD + RUN SERVER
 ###############################################
 
 if __name__ == "__main__":
+    # Start autonomous loop in background
     t = Thread(target=autonomous_loop, daemon=True)
     t.start()
 
