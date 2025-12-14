@@ -1,23 +1,17 @@
 ###############################################
-#  LEAF ROBOT DASHBOARD + AUTONOMOUS CONTROL  #
+#  SIMPLE DASHBOARD + AUTONOMOUS MOTOR CONTROL
 ###############################################
 
 from flask import Flask, render_template_string, send_file, jsonify
 from threading import Thread
 import time, json, os
-import cv2
 
 # ---- Motor Driver ----
 from motor import forward, stop as motor_stop
 
-# ---- Sensors & Classifier ----
-from ultrasonic import get_distance
-from picamera2 import Picamera2
-from leaf_cnn_runtime import classify_frame
-
 app = Flask(__name__)
 
-# Storage for images + results
+# Storage for images + results (empty in this version)
 os.makedirs("logs/images", exist_ok=True)
 results_path = "logs/results.json"
 if not os.path.exists(results_path):
@@ -26,11 +20,9 @@ if not os.path.exists(results_path):
 # Shared state
 robot_state = {"running": False}
 
-
 def set_state(v):
     robot_state["running"] = v
     print("Robot state ->", v)
-
 
 ###############################################
 # AUTONOMOUS CONTROL LOOP (runs in background)
@@ -38,79 +30,16 @@ def set_state(v):
 
 def autonomous_loop():
     print("Autonomous loop running...")
-
-    # Start camera
-    cam = Picamera2()
-    cam.configure(cam.create_preview_configuration())
-    cam.start()
-    time.sleep(1)
-
     while True:
         if robot_state["running"]:
-
-            # -------------------------------
-            #  BASIC DRIVING
-            # -------------------------------
-            forward(60)
+            forward()       # <- Robot moves forward
             time.sleep(0.1)
-
-            # -------------------------------
-            #  OBSTACLE AVOIDANCE
-            # -------------------------------
-            try:
-                dist = get_distance()
-                if dist < 20:
-                    print("Obstacle detected:", dist, "cm")
-                    motor_stop()
-                    time.sleep(0.5)
-                    continue
-            except:
-                pass
-
-            # -------------------------------
-            #  CAPTURE FRAME
-            # -------------------------------
-            frame = cam.capture_array()
-            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
-            # -------------------------------
-            #  CLASSIFY FRAME
-            # -------------------------------
-            label, conf = classify_frame(frame_bgr)
-
-            if label != "NOT_LEAF":
-                motor_stop()
-                print("Leaf Detected:", label)
-
-                # Save image
-                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-                safe_timestamp = timestamp.replace(":", "-")
-                img_path = f"logs/images/{safe_timestamp}_{label}.jpg"
-                cv2.imwrite(img_path, frame_bgr)
-
-                # Log result
-                try:
-                    logs = json.load(open(results_path))
-                except:
-                    logs = []
-
-                logs.append({
-                    "timestamp": timestamp,
-                    "result": label,
-                    "image": img_path
-                })
-
-                json.dump(logs, open(results_path, "w"), indent=2)
-
-                time.sleep(1)
-
         else:
-            motor_stop()
+            motor_stop()    # <- Robot stays stopped
             time.sleep(0.1)
-
 
 ###############################################
-# HTML DASHBOARD
+# HTML DASHBOARD TEMPLATE
 ###############################################
 
 TEMPLATE = """
@@ -119,12 +48,12 @@ TEMPLATE = """
 <head>
 <style>
 body { font-family:Arial; background:#eef; padding:20px; }
-.btn { padding:12px 24px; font-size:18px; margin:5px; cursor:pointer; border-radius:6px; }
+.btn { padding:10px 20px; font-size:18px; margin:5px; cursor:pointer; }
 .start { background:#4CAF50; color:white; }
 .stop { background:#d33; color:white; }
-table { width:100%; border-collapse:collapse; margin-top:20px; font-size:16px; }
-th,td { border:1px solid #444; padding:10px; text-align:center; }
-img { width:150px; border-radius:4px; }
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+th,td { border:1px solid #444; padding:10px; }
+img { width:150px; }
 </style>
 </head>
 <body>
@@ -148,20 +77,8 @@ function send(cmd) {
 setTimeout(()=>location.reload(), 3000);
 </script>
 
-<table>
-<tr><th>Time</th><th>Result</th><th>Image</th></tr>
-{% for e in logs %}
-<tr>
-    <td>{{e.timestamp}}</td>
-    <td>{{e.result}}</td>
-    <td><img src="/img/{{loop.index0}}"></td>
-</tr>
-{% endfor %}
-</table>
-
 </body></html>
 """
-
 
 ###############################################
 # ROUTES
@@ -175,24 +92,11 @@ def index():
         logs = []
     return render_template_string(TEMPLATE, logs=logs, running=robot_state["running"])
 
-
-@app.route("/img/<int:i>")
-def image(i):
-    logs = json.load(open(results_path))
-    
-    if i >= len(logs):
-        from flask import Response
-        return Response(b"\x89PNG\r\n\x1a\n", mimetype="image/png")
-
-    return send_file(logs[i]["image"])
-
-
 @app.route("/start", methods=["POST"])
 def start():
     print("Start pressed!")
     set_state(True)
     return jsonify({"status": "running"})
-
 
 @app.route("/stop", methods=["POST"])
 def stop():
@@ -200,7 +104,6 @@ def stop():
     set_state(False)
     motor_stop()
     return jsonify({"status": "stopped"})
-
 
 ###############################################
 # START THREAD + RUN SERVER
