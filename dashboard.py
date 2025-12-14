@@ -5,9 +5,15 @@
 from flask import Flask, render_template_string, send_file, jsonify
 from threading import Thread
 import time, json, os
+import cv2
 
 # ---- Motor Driver ----
 from motor import forward, stop as motor_stop
+
+# ---- Sensors & Classifier ----
+from ultrasonic import get_distance
+from picamera2 import Picamera2
+from leaf_cnn_runtime import classify_frame
 
 app = Flask(__name__)
 
@@ -32,17 +38,79 @@ def set_state(v):
 
 def autonomous_loop():
     print("Autonomous loop running...")
+
+    # Start camera
+    cam = Picamera2()
+    cam.configure(cam.create_preview_configuration())
+    cam.start()
+    time.sleep(1)
+
     while True:
         if robot_state["running"]:
-            forward()       # <---- THIS MAKES MOTOR MOVE
+
+            # -------------------------------
+            #  BASIC DRIVING
+            # -------------------------------
+            forward(60)
             time.sleep(0.1)
+
+            # -------------------------------
+            #  OBSTACLE AVOIDANCE
+            # -------------------------------
+            try:
+                dist = get_distance()
+                if dist < 20:
+                    print("Obstacle detected:", dist, "cm")
+                    motor_stop()
+                    time.sleep(0.5)
+                    continue
+            except:
+                pass
+
+            # -------------------------------
+            #  CAPTURE FRAME
+            # -------------------------------
+            frame = cam.capture_array()
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            # -------------------------------
+            #  CLASSIFY FRAME
+            # -------------------------------
+            label, conf = classify_frame(frame_bgr)
+
+            if label != "NOT_LEAF":
+                motor_stop()
+                print("Leaf Detected:", label)
+
+                # Save image
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                safe_timestamp = timestamp.replace(":", "-")
+                img_path = f"logs/images/{safe_timestamp}_{label}.jpg"
+                cv2.imwrite(img_path, frame_bgr)
+
+                # Log result
+                try:
+                    logs = json.load(open(results_path))
+                except:
+                    logs = []
+
+                logs.append({
+                    "timestamp": timestamp,
+                    "result": label,
+                    "image": img_path
+                })
+
+                json.dump(logs, open(results_path, "w"), indent=2)
+
+                time.sleep(1)
+
         else:
-            motor_stop()    # <---- STOPS MOTOR
+            motor_stop()
             time.sleep(0.1)
 
 
 ###############################################
-# HTML TEMPLATE
+# HTML DASHBOARD
 ###############################################
 
 TEMPLATE = """
@@ -51,12 +119,12 @@ TEMPLATE = """
 <head>
 <style>
 body { font-family:Arial; background:#eef; padding:20px; }
-.btn { padding:10px 20px; font-size:18px; margin:5px; cursor:pointer; }
+.btn { padding:12px 24px; font-size:18px; margin:5px; cursor:pointer; border-radius:6px; }
 .start { background:#4CAF50; color:white; }
 .stop { background:#d33; color:white; }
-table { width:100%; border-collapse:collapse; margin-top:20px; }
-th,td { border:1px solid #444; padding:10px; }
-img { width:150px; }
+table { width:100%; border-collapse:collapse; margin-top:20px; font-size:16px; }
+th,td { border:1px solid #444; padding:10px; text-align:center; }
+img { width:150px; border-radius:4px; }
 </style>
 </head>
 <body>
@@ -111,9 +179,11 @@ def index():
 @app.route("/img/<int:i>")
 def image(i):
     logs = json.load(open(results_path))
+    
     if i >= len(logs):
         from flask import Response
         return Response(b"\x89PNG\r\n\x1a\n", mimetype="image/png")
+
     return send_file(logs[i]["image"])
 
 
@@ -137,7 +207,6 @@ def stop():
 ###############################################
 
 if __name__ == "__main__":
-    # Start autonomous loop in background
     t = Thread(target=autonomous_loop, daemon=True)
     t.start()
 
